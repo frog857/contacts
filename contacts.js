@@ -1,5 +1,6 @@
 const express = require("express");
 const morgan = require("morgan");
+const { body, validationResult } = require("express-validator");
 const app = express();
 
 let contactData = [
@@ -41,54 +42,6 @@ const sortContacts = contacts => {
   });
 };
 
-const trimWhiteSpace = (req, res, next) => {
-  res.locals.firstName   = req.body.firstName.trim();
-  res.locals.lastName    = req.body.lastName.trim();
-  res.locals.phoneNumber = req.body.phoneNumber.trim();
-}
-
-const validateFirstName = (req, res, next) => { 
-  let firstName = res.locals.firstName;
-  if (firstName.length === 0) {
-    res.locals.errorMessages.push("First name is required.");
-  } else if (firstName.length > 25) {
-    res.locals.errorMessages.push("First name is too long. Maximum length is 25 characters.");
-  } else if (!firstName.match(/^[a-z]/gi)) {
-    res.locals.errorMessages.push("First name contains invalid characters. The name must be alphabetic.");
-  }
-}
-
-const validateLastName = (req, res, next) => { 
-  let lastName = res.locals.lastName;
-  if (lastName.length === 0) {
-    res.locals.errorMessages.push("Last name is required.");
-  } else if (lastName.length > 25) {
-    res.locals.errorMessages.push("Last name is too long. Maximum length is 25 characters.");
-  } else if (!lastName.match(/^[a-z]/gi)) {
-    res.locals.errorMessages.push("Last name contains invalid characters. The name must be alphabetic.");
-  }
-}
-
-const validatePhoneNumber = (req, res, next) => {
-  let phoneNumber = req.body.phoneNumber;
-  if (phoneNumber.length === 0) {
-    res.locals.errorMessages.push("Phone number is required.");
-  } else if (!phoneNumber.match(/^\d\d\d-\d\d\d-\d\d\d\d$/)) {
-    res.locals.errorMessages.push("Must be a valid phone number: ###-###-####")
-  }
-}
-
-const checkForDuplicates = (req, res, next) => {
-  let fullName = `${res.locals.firstName} ${res.locals.lastName}`;
-  let foundContact = contactData.find(contact => {
-    return `${contact.firstName} ${contact.lastName}` === fullName;
-  });
-
-  if (foundContact) {
-    res.locals.errorMessages.push(`${fullName} is already on your contact list. Duplicates are not allowed.`);
-  }
-}
-
 app.set("views", "./views");
 app.set("view engine", "pug");
 
@@ -113,37 +66,43 @@ app.get("/contacts/new", (req, res) => {
 });
 
 app.post("/contacts/new",
+  [
+    body("firstName")
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("First name is required.")
+      .bail()
+      .isLength({ max: 25 })
+      .withMessage("First name is too long. Maximum length is 25 characters.")
+      .isAlpha()
+      .withMessage("First name contains invalid characters. The name must be alphabetic."),
+
+    body("lastName")
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Last name is required.")
+      .bail()
+      .isLength({ max: 25 })
+      .withMessage("Last name is too long. Maximum length is 25 characters.")
+      .isAlpha()
+      .withMessage("Last name contains invalid characters. The name must be alphabetic."),
+
+    body("phoneNumber")
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Phone number is required.")
+      .bail()
+      .matches(/^\d\d\d-\d\d\d-\d\d\d\d$/)
+      .withMessage("Invalid phone number format. Use ###-###-####."),
+  ],
   (req, res, next) => {
-    res.locals.errorMessages = [];
-    next();
-  },
-  (req, res, next) => {
-    trimWhiteSpace(req, res);
-    next()
-  },
-  (req, res, next) => {
-    validateFirstName(req, res);
-    next();
-  },
-    (req, res, next) => {
-    validateLastName(req, res);
-    next();
-  },
-    (req, res, next) => {
-    validatePhoneNumber(req, res);
-    next();
-  },
-    (req, res, next) => {
-    checkForDuplicates(req, res);
-    next();
-  },
-  (req, res, next) => {
-    if (res.locals.errorMessages.length > 0) {
+    let errors = validationResult(req)
+    if (!errors.isEmpty()) {
       res.render("new-contact", {
-        firstName: res.locals.firstName,
-        lastName: res.locals.lastName,
-        phoneNumner: res.locals.phoneNumber,
-        errorMessages: res.locals.errorMessages,
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
+        phoneNumner: req.body.phoneNumber,
+        errorMessages: errors.array().map(error => error.msg),
       });
     } else {
       next();
