@@ -50,9 +50,7 @@ app.use(express.urlencoded({extended: false}));
 app.use(morgan("common"));
 
 app.get("/", (req, res) => {
-  res.redirect("/contacts", {
-    contacts: sortContacts(contactData),
-  });
+  res.redirect("/contacts");
 });
 
 app.get("/contacts", (req, res) => {
